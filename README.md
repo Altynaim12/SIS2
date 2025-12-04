@@ -1,50 +1,50 @@
-Flip.kz Mini Data Pipeline
-Project Overview
+# Flip.kz Data Pipeline
 
-A lightweight but complete mini-ETL pipeline designed to extract, clean, and load product data from the dynamic e-commerce website Flip.kz.
-The workflow is automated using Apache Airflow, demonstrating a full “from website to database” process.
+## Project Overview
+A lightweight yet complete mini-ETL pipeline designed to extract, clean, and load product data from the dynamic e-commerce website **Flip.kz**.  
+The workflow is fully automated using **Apache Airflow**, demonstrating a complete **“from website to database”** process.
 
-Key Features
+---
 
-Dynamic Scraping
-Extracts product data from the JavaScript-rendered Flip.kz catalog using Selenium WebDriver.
+## Key Features
 
-Data Quality
-Cleans raw scraped data, removes duplicates, handles missing values, and normalizes text and numeric fields.
+- **Dynamic Scraping** — Extracts product data from a JavaScript-rendered Flip.kz catalog using **Selenium WebDriver**.
+- **Data Quality** — Cleans raw scraped data, removes duplicates, handles missing values, and normalizes text and numeric fields.
+- **SQLite Storage** — Stores processed data in a SQLite database (`output.db`) with a simple and clear schema.
+- **Automation** — Entire pipeline is orchestrated via an **Airflow DAG**, running once per day with built-in logging and retries.
+- **Fallback Mode** — If Flip.kz blocks automated scraping, the scraper switches to fallback mode and generates a mock dataset (120+ rows) to guarantee ETL stability.
 
-SQLite Storage
-Stores processed data in a SQLite database (output.db) using a simple and clear schema.
+---
 
-Automation
-The entire pipeline is orchestrated via an Airflow DAG, scheduled to run once per day with logging and retries.
+# 1. Website Description
 
-Fallback Mode
-If Flip.kz blocks automated scraping, the pipeline switches to fallback mode and generates a mock dataset (120+ rows) to guarantee ETL stability.
+**Chosen Website:** Flip.kz Books Catalog  
+**URL:** https://flip.kz  
 
-1. Website Description
+Flip.kz renders product listings dynamically using JavaScript, requiring a browser automation tool for extraction.
 
-Chosen Website: Flip.kz Books Catalog — https://flip.kz
+The scraping module (`src/scraper.py`) uses:
 
-Flip.kz renders product listings dynamically using JavaScript, so a browser automation tool is required for extraction.
+- Selenium WebDriver  
+- Automated scrolling to load dynamic content  
+- Stable HTML element selection  
 
-The scraping module (src/scraper.py) uses:
+### Extracted Fields
 
-Selenium WebDriver
+| Field | Description |
+|-------|-------------|
+| **title** | Book name |
+| **price** | Numeric book price |
+| **url** | Direct link to the product |
 
-Automated scrolling to load dynamic content
+If JavaScript blocks loading, the scraper generates a fallback dataset to ensure the pipeline remains stable.
 
-Stable HTML element selection
+---
 
-Extracted Fields
-Field	Description
-title	Book name
-price	Numeric book price
-url	Direct link to the product
+# 2. Execution and Setup
 
-If JavaScript blocks access, the scraper automatically switches to fallback mode and generates a consistent dataset.
+## Project Structure
 
-2. Execution and Setup
-Project Structure
 flip_books_pipeline/
 │
 ├── README.md
@@ -52,101 +52,92 @@ flip_books_pipeline/
 ├── airflow_dag.py
 │
 ├── src/
-│   ├── scraper.py
-│   ├── cleaner.py
-│   └── loader.py
+│ ├── scraper.py
+│ ├── cleaner.py
+│ └── loader.py
 │
 ├── data/
-│   ├── raw_flip.csv
-│   ├── clean_flip.csv
-│   └── output.db
+│ ├── raw_flip.csv
+│ ├── clean_flip.csv
+│ └── output.db
 │
 └── create_table.sql
 
-3. How to Run Airflow
-Start Services (Docker Compose)
-docker compose up -d
+---
 
-If running Airflow locally (without Docker)
+## How to Run Airflow (Local Environment)
 
-Initialize Airflow database:
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
 
+2. Initialize Airflow
 airflow db init
 
+3. Start Airflow Services (Two Terminals)
 
-Start webserver:
-
-airflow webserver -p 8080
-
-
-Start scheduler:
+Terminal 1 — Scheduler
 
 airflow scheduler
 
-Access the Web Interface
 
-Open:
+Terminal 2 — Webserver
 
+airflow webserver --port 8080
+
+4. Trigger the Pipeline
+
+Open Airflow UI:
 http://localhost:8080
 
+Locate the DAG: flip_books_pipeline
+Turn it ON → Click Trigger DAG
 
-Locate and enable the DAG:
+Pipeline flow:
 
-flip_books_pipeline
-
-
-Trigger a run.
-
-Pipeline Execution Order
 Scraping → Cleaning → Loading → SQLite Storage
 
+---
+# 3. Database Schema
 
-Airflow logs will show scraping progress, cleaning operations, and database insertion details.
+Data is stored in data/output.db using the following schema:
 
-4. Database Schema
+| Table Name   | Purpose              | Key Fields                         | Relationship |
+| ------------ | -------------------- | ---------------------------------- | ------------ |
+| **products** | Flip.kz book catalog | `id` (PK), `title`, `price`, `url` | —            |
 
-Data is stored in data/output.db.
 
-Table: products
-Column	Type	Description
-id	INTEGER PRIMARY KEY	Unique identifier
-title	TEXT	Book name
-price	REAL	Numeric price
-url	TEXT	Direct product link
-5. Expected Output
+---
+#4. Expected Output
 
-After successful execution, the following outputs will be generated:
+1. Raw Dataset
 
-1. Raw Data
+data/raw_flip.csv — raw scraped data or fallback dataset (120+ rows)
 
-data/raw_flip.csv
-Contains scraped data or fallback dataset (120+ rows).
+2. Clean Dataset
 
-2. Cleaned Data
-
-data/clean_flip.csv
-Includes:
-
-normalized types
-
-removed duplicates
-
-missing values handled
+data/clean_flip.csv — cleaned, deduplicated data with normalized types
 
 3. SQLite Database
 
-data/output.db containing:
+data/output.db — containing table products with fields:
 
-products (id, title, price, url)
+id
+
+title
+
+price
+
+url
 
 4. Airflow Logs
 
-Logs from scraper, cleaner and loader tasks will include:
+The following information will appear in Airflow logs:
 
-Number of scraped items
+number of scraped items
 
-Number of cleaned items
+number of cleaned entries
 
-Number of duplicates removed
+duplicates removed
 
-Final inserted row count
+final record count inserted into SQLite
