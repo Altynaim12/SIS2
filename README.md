@@ -1,129 +1,120 @@
-# Flip.kz Mini Data Pipeline  
-Scraping → Cleaning → SQLite Database → Airflow Automation
+Flip.kz Mini Data Pipeline
+Project Overview:
 
-# 1. Website Description
+A lightweight yet complete mini-ETL pipeline designed to extract, clean, and load product data from the dynamic e-commerce website Flip.kz.
+The workflow is fully automated with Apache Airflow, demonstrating a complete “from website to database” process.
 
-Проект направлен на сбор данных с динамического сайта **https://flip.kz**, где контент подгружается через JavaScript при прокрутке страницы.  
-Для обработки такого контента используется **Selenium WebDriver**, который открывает браузер, имитирует скроллинг и извлекает данные о книгах:
+Key Features
 
-- Название (`title`)
-- Цена (`price`)
-- Ссылка на товар (`url`)
+Dynamic Scraping:
+Extracts product data from a JavaScript-rendered Flip.kz catalog using Selenium WebDriver.
 
-Flip.kz имеет ограничения на headless-режим, поэтому в проект добавлен fallback:  
-если сайт блокирует автоматический сбор данных, генерируется тестовый набор данных (120 записей), чтобы весь пайплайн всегда выполнялся корректно.
+Data Quality:
+Cleans and validates raw scraped data, removes duplicates, handles missing values, and normalizes text and numeric fields.
 
+SQLite Storage:
+Stores the processed dataset in a SQLite database (output.db) with a clear, simple schema.
 
-# 2. How to Run Scraping
+Automation:
+Entire pipeline is orchestrated through an Airflow DAG, scheduled to run once per day with built-in logging and retries.
 
-# ▶ 2.1 Install Requirements
+Fallback Mode:
+If Flip.kz blocks headless scrapers, the pipeline automatically generates a mock dataset (120+ records) to ensure successful downstream processing.
 
-```bash
-pip install -r requirements.txt
-▶ 2.2 Run Selenium Scraper
-bash
-Копировать код
-python src/scraper.py
-После выполнения появится файл:
+1. Website Description
 
-bash
-Копировать код
-data/raw_flip.csv
-Он содержит минимум 120 строк с информацией о книгах.
+Chosen Website:
+📌 Flip.kz Books Catalog — https://flip.kz
 
-▶ 2.3 Clean the Data
-bash
-Копировать код
-python src/cleaner.py
-Создаётся файл:
+Flip.kz dynamically renders product listings via JavaScript, requiring a browser automation tool for reliable extraction.
+The scraping module (src/scraper.py) uses:
 
-bash
-Копировать код
-data/clean_flip.csv
-Данные очищаются от дубликатов, пропусков, приводятся к корректным типам.
+Selenium WebDriver
 
-▶ 2.4 Load Data into SQLite Database
-bash
-Копировать код
-python src/loader.py
-Создаётся база данных:
+Automated scrolling to load dynamic content
 
-bash
-Копировать код
-data/output.db
-В ней — таблица products с тремя полями:
-title, price, url.
+Robust element selection to capture:
 
-3. How to Run Airflow
-Проект включает DAG, который автоматизирует весь процесс:
+Field	Description
+title	Book name
+price	Book price (numeric)
+url	Direct link to product
 
-nginx
-Копировать код
-scrape_data → clean_data → load_to_db
-▶ 3.1 Copy DAG File
-Поместите файл:
+If JavaScript blocks or content fails to load, the scraper switches to fallback mode and generates a consistent dataset so the pipeline remains stable.
 
-Копировать код
-airflow_dag.py
-в папку:
+2. Execution and Setup
+Project Structure
 
-bash
-Копировать код
-AIRFLOW_HOME/dags/
-▶ 3.2 Initialize Airflow
-bash
-Копировать код
+flip_books_pipeline/
+│
+├── README.md
+├── requirements.txt
+├── airflow_dag.py
+│
+├── src/
+│   ├── scraper.py       
+│   ├── cleaner.py       
+│   └── loader.py        
+│
+├── data/
+│   ├── raw_flip.csv     
+│   ├── clean_flip.csv   
+│   └── output.db       
+│
+└── create_table.sql     
+
+4. How to Run Airflow
+
+Start Services:
+Launch the Airflow environment (if using Docker Compose):
+
+docker compose up -d
+
+If you are running Airflow locally (without Docker), start the database:
+
 airflow db init
-▶ 3.3 Start Webserver and Scheduler
-В двух разных терминалах:
 
-bash
-Копировать код
-airflow webserver -p 8080
-bash
-Копировать код
-airflow scheduler
-▶ 3.4 Open Airflow UI
-arduino
-Копировать код
+Access UI:
+Open the Airflow web interface:
+
 http://localhost:8080
-В интерфейсе появится DAG:
 
-nginx
-Копировать код
-flip_books_pipeline
-Его можно запускать вручную или по расписанию (@daily, не чаще 1 раза в сутки).
+Trigger DAG:
+Locate the flip_books_pipeline DAG, ensure it is ON, and trigger a run.
+
+The pipeline executes tasks sequentially:
+
+Scraping → Cleaning → Loading → SQLite Storage
+
+Airflow will show logs for each step, including browser launch (Selenium), preprocessing, and database insertion.
+
+3. Database Schema
+
+Data is stored in `data/output.db` in a simple schema.
+
+| Table Name | Purpose                     | Key Fields                 | Relationship |
+|-----------|-----------------------------|----------------------------|-------------|
+| products  | Book catalog from Flip.kz   | id (PK), title, price      | –           |
 
 4. Expected Output
-После корректного выполнения пайплайна вы получите:
 
-📄 1. data/raw_flip.csv
-минимум 120 строк
+Upon successful completion, the following artifacts and logs will be generated:
 
-поля: title, price, url
+Database:
+The file data/output.db will be created or updated.
+It contains the table products with cleaned and structured Flip.kz book data.
 
-📄 2. data/clean_flip.csv
-очищенные данные
+Data Volume:
+The database will contain at least 100 records (fallback mode guarantees enough rows even if the website blocks scraping).
 
-приведённые типы
+Logs:
+The Airflow loader task will confirm successful data insertion into SQLite.
+The scraper and cleaner tasks will also log:
 
-удалённые дубликаты
+number of raw items scraped
 
-🗄 3. data/output.db
-SQLite база с таблицей:
+number of cleaned entries
 
-pgsql
-Копировать код
-products(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT,
-    price REAL,
-    url TEXT
-)
-🌀 4. Airflow DAG
-Автоматически выполняет:
+removed duplicates
 
-nginx
-Копировать код
-scrape_data → clean_data → load_to_db
-и отображает логи успешного выполнения.
+final inserted row count
