@@ -45,6 +45,7 @@ If JavaScript blocks loading, the scraper generates a fallback dataset to ensure
 
 ## Project Structure
 
+```
 flip_books_pipeline/
 │
 ├── README.md
@@ -52,92 +53,87 @@ flip_books_pipeline/
 ├── airflow_dag.py
 │
 ├── src/
-│ ├── scraper.py
-│ ├── cleaner.py
-│ └── loader.py
+│   ├── scraper.py
+│   ├── cleaner.py
+│   └── loader.py
 │
 ├── data/
-│ ├── raw_flip.csv
-│ ├── clean_flip.csv
-│ └── output.db
+│   ├── raw_flip.csv
+│   ├── clean_flip.csv
+│   └── output.db
 │
 └── create_table.sql
+```
 
----
 
 ## How to Run Airflow (Local Environment)
 
 ### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
+```
 
-2. Initialize Airflow
+### 2. Initialize Airflow
+```bash
 airflow db init
+```
 
-3. Start Airflow Services (Two Terminals)
+### 3. Start Airflow Services (Two Terminals)
 
-Terminal 1 — Scheduler
-
+**Terminal 1 — Scheduler**
+```bash
 airflow scheduler
+```
 
-
-Terminal 2 — Webserver
-
+**Terminal 2 — Webserver**
+```bash
 airflow webserver --port 8080
+```
 
-4. Trigger the Pipeline
+### 4. Trigger the Pipeline
 
-Open Airflow UI:
-http://localhost:8080
+Open Airflow UI: http://localhost:8080  
+Locate the DAG: **flip_books_pipeline** → Turn it ON → Trigger DAG.
 
-Locate the DAG: flip_books_pipeline
-Turn it ON → Click Trigger DAG
+The pipeline flow:
 
-Pipeline flow:
-
-Scraping → Cleaning → Loading → SQLite Storage
+**Scraping → Cleaning → Loading → SQLite Storage**
 
 ---
+
 # 3. Database Schema
 
-Data is stored in data/output.db using the following schema:
+Data is stored in `data/output.db` using the following schema:
 
 | Table Name   | Purpose              | Key Fields                         | Relationship |
-| ------------ | -------------------- | ---------------------------------- | ------------ |
+|--------------|----------------------|------------------------------------|--------------|
 | **products** | Flip.kz book catalog | `id` (PK), `title`, `price`, `url` | —            |
 
+---
+
+# 4. Expected Output
+
+### 1. Raw Dataset  
+`data/raw_flip.csv` — raw scraped data or fallback dataset (120+ rows)
+
+### 2. Clean Dataset  
+`data/clean_flip.csv` — cleaned, deduplicated data with normalized types
+
+### 3. SQLite Database  
+`data/output.db` — table **products** containing:
+
+- id  
+- title  
+- price  
+- url  
+
+### 4. Airflow Logs  
+Airflow will show logs containing:
+
+- number of scraped items  
+- number of cleaned entries  
+- duplicates removed  
+- final inserted record count  
 
 ---
-#4. Expected Output
 
-1. Raw Dataset
-
-data/raw_flip.csv — raw scraped data or fallback dataset (120+ rows)
-
-2. Clean Dataset
-
-data/clean_flip.csv — cleaned, deduplicated data with normalized types
-
-3. SQLite Database
-
-data/output.db — containing table products with fields:
-
-id
-
-title
-
-price
-
-url
-
-4. Airflow Logs
-
-The following information will appear in Airflow logs:
-
-number of scraped items
-
-number of cleaned entries
-
-duplicates removed
-
-final record count inserted into SQLite
